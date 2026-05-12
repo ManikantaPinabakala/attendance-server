@@ -3,7 +3,6 @@ import cors from "cors";
 import morgan from "morgan";
 import env from "./config.js";
 import { router } from "./handlers/routes.js";
-import { connectAndQuery } from "./services/db/client.js";
 
 const app = express();
 
@@ -40,7 +39,7 @@ app.use("/api", router);
 // Start the server after initializing tables
 (async () => {
   try {
-    await connectAndQuery();
+    // await connectAndQuery();
     app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
     });

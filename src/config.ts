@@ -15,11 +15,8 @@ const baseConfigSchema = z.object({
 
   PORT: z.coerce.number().int().positive(),
 
-  DBHOST: z.string().min(1),
-  DBPORT: z.coerce.number().int().positive(),
-  DBUSER: z.string().min(1),
-  DBPASS: z.string().min(1),
-  DBNAME: z.string().min(1),
+  DATABASE_URL: z.string().min(1),
+  DIRECT_URL: z.string().min(1),
   SECRET_KEY: z.string().min(1),
 });
 
