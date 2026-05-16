@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import env from "./config.js";
-import { router } from "./handlers/routes.js";
+import healthRoute from "./handlers/routes.js";
 
 const app = express();
 
@@ -26,6 +26,7 @@ const corsOptions: cors.CorsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(/./, cors(corsOptions));
 morgan.token("local-time", () => {
   return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 });
@@ -34,7 +35,7 @@ app.use(morgan(":method :url :status - :response-time ms - [:local-time]"));
 app.use(express.json());
 
 // Use the imported routes
-app.use("/api", router);
+app.use("/api", healthRoute);
 
 // Start the server after initializing tables
 (async () => {
