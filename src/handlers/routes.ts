@@ -3,7 +3,7 @@ import { Request, Response, Router } from "express";
 export type RouteHandler = (req: Request, res: Response) => void;
 export const defineRoute = (handler: RouteHandler) => handler;
 
-export const router = Router();
+const router = Router();
 
 router.get(
   "/health",
@@ -12,4 +12,6 @@ router.get(
   }),
 );
 
+
+export default router
 
