@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ENUMS
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  DAILY_WAGE
+  APPRENTICE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LEAVE
+  WEEK_OFF
+  HOLIDAY
+}
+
+enum PunchType {
+  IN
+  OUT
+}
+
+enum DeviceType {
+  BIOMETRIC
+  MOBILE
+  FACE_TERMINAL
+  RFID
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AttendanceMarkingType {
+  SELF
+  SUPERVISOR
+  BIOMETRIC
+  FACE_SCAN
+  GPS
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  HR
+  SUPERVISOR
+  SECURITY
+  DEVICE_OPERATOR
+}
+
+model Admin {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  phone           String?
+  role            AdminRole
+  isActive        Boolean   @default(true)
+  siteId          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  site            Site? @relation(fields: [siteId], references: [id])
+  attendanceActions AttendanceAction[]
+
+  @@map("admins")
+
+  @@index([email])
+  @@index([role])
+  @@index([siteId])
+  @@index([isActive])
+}
+
+// SITES
+model Site {
+  id                   String             @id @default(uuid())
+  name                 String
+  address              String?
+  latitude             Decimal?           @db.Decimal(10, 7)
+  longitude            Decimal?           @db.Decimal(10, 7)
+  geofenceRadiusMeters Int                @default(100)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  workers              Worker[]
+  attendanceDevices    AttendanceDevice[]
+  holidays             Holiday[]
+  admins               Admin[]
+
+  @@index([name])
+  @@map("sites")
+}
+
+// DEPARTMENTS
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workers   Worker[]
+
+  @@map("departments")
+}
+
+// DESIGNATIONS
+model Designation {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workers   Worker[]
+
+  @@map("designations")
+}
+
+// WORKERS
+model Worker {
+  id                    String                     @id @default(uuid())
+  employeeCode          String                     @unique
+  firstName             String
+  lastName              String?
+  phone                 String?
+  email                 String?
+  departmentId          String?
+  designationId         String?
+  siteId                String?
+  employmentType        EmploymentType             @default(PERMANENT)
+  joiningDate           DateTime
+  biometricId           String?
+  faceId                String?
+  isActive              Boolean                    @default(true)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  department            Department?                @relation(fields: [departmentId], references: [id])
+  designation           Designation?               @relation(fields: [designationId], references: [id])
+  site                  Site?                      @relation(fields: [siteId], references: [id])
+  workerShifts          WorkerShift[]
+  attendanceLogs        AttendanceLog[]
+  attendance            Attendance[]
+  leaveRequests         LeaveRequest[]
+  approvedLeaves        LeaveRequest[]             @relation("ApprovedBy")
+  payrollSummaries      PayrollAttendanceSummary[]
+  attendanceCorrections AttendanceCorrection[]
+  attendanceActions     AttendanceAction[]
+  geofenceHistory       GeofenceHistory[]
+
+  @@index([employeeCode])
+  @@index([departmentId])
+  @@index([designationId])
+  @@index([siteId])
+  @@index([isActive])
+  @@index([joiningDate])
+  @@map("workers")
+}
+
+// SHIFTS
+model Shift {
+  id                   String        @id @default(uuid())
+  name                 String
+  startTime            DateTime      @db.Time(0)
+  endTime              DateTime      @db.Time(0)
+  graceInMinutes       Int           @default(10)
+  graceOutMinutes      Int           @default(10)
+  overtimeAfterMinutes Int           @default(30)
+  isNightShift         Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  workerShifts         WorkerShift[]
+
+  @@index([name])
+  @@index([isNightShift])
+  @@map("shifts")
+}
+
+// WORKER SHIFT ASSIGNMENTS
+model WorkerShift {
+  id            String    @id @default(uuid())
+  workerId      String
+  shiftId       String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  worker        Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  shift         Shift     @relation(fields: [shiftId], references: [id])
+
+  @@unique([workerId, shiftId, effectiveFrom])
+  @@index([workerId])
+  @@index([shiftId])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+  @@map("worker_shifts")
+}
+
+// Audit log of admin activities related to attendance management (manual adjustments, approvals, etc.)
+model AttendanceAction {
+  id                  String   @id @default(uuid())
+  adminId             String
+  workerId            String
+  attendanceId        String?
+  actionType          String
+  remarks             String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime        @updatedAt
+  admin               Admin @relation(fields: [adminId], references: [id])
+  worker              Worker @relation(fields: [workerId], references: [id])
+  attendance          Attendance? @relation(fields: [attendanceId], references: [id])
+
+  @@map("attendance_actions")
+
+  @@index([adminId])
+
+  @@index([workerId])
+
+  @@index([attendanceId])
+
+  @@index([createdAt])
+}
+
+// ATTENDANCE DEVICES
+model AttendanceDevice {
+  id             String          @id @default(uuid())
+  siteId         String?
+  deviceName     String
+  serialNumber   String          @unique
+  type           DeviceType
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  site           Site?           @relation(fields: [siteId], references: [id])
+  attendanceLogs AttendanceLog[]
+
+  @@index([siteId])
+  @@index([type])
+  @@index([isActive])
+  @@map("attendance_devices")
+}
+
+// ATTENDANCE LOGS (RAW PUNCHES)
+model AttendanceLog {
+  id        BigInt    @id @default(autoincrement())
+  workerId  String
+  punchTime DateTime
+  punchType PunchType
+  deviceId  String?
+
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+
+  selfieImageUrl String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  worker         Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  device         AttendanceDevice? @relation(fields: [deviceId], references: [id])
+
+  @@index([workerId])
+  @@index([punchTime])
+  @@index([punchType])
+  @@index([workerId, punchTime])
+  @@index([deviceId])
+  @@index([createdAt])
+  @@map("attendance_logs")
+}
+
+// DAILY ATTENDANCE SUMMARY
+model Attendance {
+  id               String                 @id @default(uuid())
+  workerId         String
+  attendanceDate   DateTime               @db.Date
+  checkIn          DateTime?
+  checkOut         DateTime?
+  status           AttendanceStatus       @default(PRESENT)
+  lateMinutes      Int                    @default(0)
+  earlyExitMinutes Int                    @default(0)
+  overtimeMinutes  Int                    @default(0)
+  markingType      AttendanceMarkingType  @default(SELF)
+  remarks          String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  worker           Worker                 @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  corrections      AttendanceCorrection[]
+  attendanceActions AttendanceAction[]
+
+  @@unique([workerId, attendanceDate])
+  @@index([attendanceDate])
+  @@index([status])
+  @@index([workerId, attendanceDate])
+  @@index([checkIn])
+  @@index([checkOut])
+  @@map("attendance")
+}
+
+// LEAVE REQUESTS
+model LeaveRequest {
+  id             String         @id @default(uuid())
+  workerId       String
+  leaveType      String
+  fromDate       DateTime       @db.Date
+  toDate         DateTime       @db.Date
+  reason         String?
+  approvalStatus ApprovalStatus @default(PENDING)
+  approvedById   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  worker         Worker         @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  approvedBy     Worker?        @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  @@index([workerId])
+  @@index([fromDate])
+  @@index([toDate])
+  @@index([approvalStatus])
+  @@index([workerId, fromDate])
+  @@map("leave_requests")
+}
+
+model Holiday {
+  id          String   @id @default(uuid())
+  siteId      String?
+  holidayName String
+  holidayDate DateTime @db.Date
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  site        Site?    @relation(fields: [siteId], references: [id])
+
+  @@unique([siteId, holidayDate])
+  @@index([holidayDate])
+  @@index([siteId])
+  @@map("holidays")
+}
+
+// PAYROLL ATTENDANCE SUMMARY
+model PayrollAttendanceSummary {
+  id            String   @id @default(uuid())
+  workerId      String
+  payrollMonth  String
+  presentDays   Decimal  @default(0) @db.Decimal(5, 2)
+  absentDays    Decimal  @default(0) @db.Decimal(5, 2)
+  overtimeHours Decimal  @default(0) @db.Decimal(6, 2)
+  payableDays   Decimal  @default(0) @db.Decimal(5, 2)
+  generatedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, payrollMonth])
+  @@index([workerId])
+  @@index([payrollMonth])
+  @@index([generatedAt])
+  @@map("payroll_attendance_summary")
+}
+
+// OPTIONAL FUTURE TABLES
+// Request to change attendance records (for corrections, missed punches, etc.)
+model AttendanceCorrection {
+  id                String         @id @default(uuid())
+  workerId          String
+  attendanceId      String
+  requestedCheckIn  DateTime?
+  requestedCheckOut DateTime?
+  reason            String
+  approvalStatus    ApprovalStatus @default(PENDING)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  worker            Worker         @relation(fields: [workerId], references: [id])
+  attendance        Attendance     @relation(fields: [attendanceId], references: [id])
+
+  @@index([workerId])
+  @@index([attendanceId])
+  @@index([approvalStatus])
+  @@map("attendance_corrections")
+}
+
+// CONTRACTORS
+model Contractor {
+  id            String   @id @default(uuid())
+  companyName   String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyName])
+  @@map("contractors")
+}
+
+// GEO FENCE HISTORY (optional)
+model GeofenceHistory {
+  id        BigInt   @id @default(autoincrement())
+  workerId  String
+  latitude  Decimal  @db.Decimal(10, 7)
+  longitude Decimal  @db.Decimal(10, 7)
+  eventTime DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  worker    Worker   @relation(fields: [workerId], references: [id])
+
+  @@index([workerId])
+  @@index([eventTime])
+  @@index([workerId, eventTime])
+  @@map("geofence_history")
+}
