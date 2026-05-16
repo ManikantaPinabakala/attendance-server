@@ -51,6 +51,36 @@ enum AttendanceMarkingType {
   GPS
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  HR
+  SUPERVISOR
+  SECURITY
+  DEVICE_OPERATOR
+}
+
+model Admin {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  phone           String?
+  role            AdminRole
+  isActive        Boolean   @default(true)
+  siteId          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  site            Site? @relation(fields: [siteId], references: [id])
+  attendanceActions AttendanceAction[]
+
+  @@map("admins")
+
+  @@index([email])
+  @@index([role])
+  @@index([siteId])
+  @@index([isActive])
+}
+
 // SITES
 model Site {
   id                   String             @id @default(uuid())
@@ -64,6 +94,7 @@ model Site {
   workers              Worker[]
   attendanceDevices    AttendanceDevice[]
   holidays             Holiday[]
+  admins               Admin[]
 
   @@index([name])
   @@map("sites")
@@ -119,6 +150,7 @@ model Worker {
   approvedLeaves        LeaveRequest[]             @relation("ApprovedBy")
   payrollSummaries      PayrollAttendanceSummary[]
   attendanceCorrections AttendanceCorrection[]
+  attendanceActions     AttendanceAction[]
   geofenceHistory       GeofenceHistory[]
 
   @@index([employeeCode])
@@ -169,6 +201,31 @@ model WorkerShift {
   @@map("worker_shifts")
 }
 
+// Audit log of admin activities related to attendance management (manual adjustments, approvals, etc.)
+model AttendanceAction {
+  id                  String   @id @default(uuid())
+  adminId             String
+  workerId            String
+  attendanceId        String?
+  actionType          String
+  remarks             String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime        @updatedAt
+  admin               Admin @relation(fields: [adminId], references: [id])
+  worker              Worker @relation(fields: [workerId], references: [id])
+  attendance          Attendance? @relation(fields: [attendanceId], references: [id])
+
+  @@map("attendance_actions")
+
+  @@index([adminId])
+
+  @@index([workerId])
+
+  @@index([attendanceId])
+
+  @@index([createdAt])
+}
+
 // ATTENDANCE DEVICES
 model AttendanceDevice {
   id             String          @id @default(uuid())
@@ -189,7 +246,6 @@ model AttendanceDevice {
 }
 
 // ATTENDANCE LOGS (RAW PUNCHES)
-
 model AttendanceLog {
   id        BigInt    @id @default(autoincrement())
   workerId  String
@@ -216,7 +272,6 @@ model AttendanceLog {
 }
 
 // DAILY ATTENDANCE SUMMARY
-
 model Attendance {
   id               String                 @id @default(uuid())
   workerId         String
@@ -233,6 +288,7 @@ model Attendance {
   updatedAt        DateTime               @updatedAt
   worker           Worker                 @relation(fields: [workerId], references: [id], onDelete: Cascade)
   corrections      AttendanceCorrection[]
+  attendanceActions AttendanceAction[]
 
   @@unique([workerId, attendanceDate])
   @@index([attendanceDate])
@@ -303,6 +359,7 @@ model PayrollAttendanceSummary {
 }
 
 // OPTIONAL FUTURE TABLES
+// Request to change attendance records (for corrections, missed punches, etc.)
 model AttendanceCorrection {
   id                String         @id @default(uuid())
   workerId          String
@@ -337,7 +394,7 @@ model Contractor {
   @@map("contractors")
 }
 
-// GEO FENCE HISTORY
+// GEO FENCE HISTORY (optional)
 model GeofenceHistory {
   id        BigInt   @id @default(autoincrement())
   workerId  String
