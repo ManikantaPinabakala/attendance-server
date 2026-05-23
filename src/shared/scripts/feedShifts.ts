@@ -9,8 +9,8 @@ const prisma = new PrismaClient();
 const shiftsData = [
   {
     name: "Morning Shift",
-    startTime: "09:00",
-    endTime: "05:30",
+    startTime: new Date("1970-01-01T09:00:00Z"),
+    endTime: new Date("1970-01-01T17:30:00Z"),
     isNightShift: false,
   },
 ];
