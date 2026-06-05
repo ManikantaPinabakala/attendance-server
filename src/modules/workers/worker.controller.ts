@@ -183,3 +183,62 @@ export const updateWorker = defineRoute(async (req, res) => {
     });
   }
 });
+
+export const fetchAllWorkers = defineRoute(async (req, res) => {
+  try {
+    const workers = await prisma.worker.findMany();
+
+    return ApiResponse.success(res, {
+      message: "Workers fetched successfully",
+      data: workers,
+      statusCode: 200,
+    });
+  } catch (error: any) {
+    return ApiResponse.error(res, {
+      message: "Failed to fetch workers",
+      statusCode: 500,
+    });
+  }
+});
+
+export const deleteWorker = defineRoute(async (req, res) => {
+  try {
+    const wId = String(req.params.wId);
+
+    if (!wId) {
+      return ApiResponse.error(res, {
+        message: "Invalid worker ID",
+        statusCode: 400,
+      });
+    }
+
+    const existingWorker = await prisma.worker.findUnique({
+      where: {
+        id: wId,
+      },
+    });
+
+    if (!existingWorker) {
+      return ApiResponse.error(res, {
+        message: "Worker not found",
+        statusCode: 404,
+      });
+    }
+
+    await prisma.worker.delete({
+      where: {
+        id: wId,
+      },
+    });
+
+    return ApiResponse.success(res, {
+      message: "Worker deleted successfully",
+      statusCode: 200,
+    });
+  } catch (error: any) {
+    return ApiResponse.error(res, {
+      message: "Failed to delete worker",
+      statusCode: 500,
+    });
+  }
+});
