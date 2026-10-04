@@ -72,6 +72,8 @@ model Admin {
   updatedAt       DateTime  @updatedAt
   site            Site? @relation(fields: [siteId], references: [id])
   attendanceActions AttendanceAction[]
+  approvedLeaves LeaveRequest[] @relation("LeaveApprovedBy")
+  approvedCorrections AttendanceCorrection[] @relation("CorrectionApprovedBy")
 
   @@map("admins")
 
@@ -89,6 +91,8 @@ model Site {
   latitude             Decimal?           @db.Decimal(10, 7)
   longitude            Decimal?           @db.Decimal(10, 7)
   geofenceRadiusMeters Int                @default(100)
+  timezone             String             @default("Asia/Kolkata")
+  isActive             Boolean            @default(true)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   workers              Worker[]
@@ -147,7 +151,6 @@ model Worker {
   attendanceLogs        AttendanceLog[]
   attendance            Attendance[]
   leaveRequests         LeaveRequest[]
-  approvedLeaves        LeaveRequest[]             @relation("ApprovedBy")
   payrollSummaries      PayrollAttendanceSummary[]
   attendanceCorrections AttendanceCorrection[]
   attendanceActions     AttendanceAction[]
@@ -172,6 +175,7 @@ model Shift {
   graceOutMinutes      Int           @default(10)
   overtimeAfterMinutes Int           @default(30)
   isNightShift         Boolean       @default(false)
+  isActive             Boolean       @default(true)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
   workerShifts         WorkerShift[]
@@ -234,6 +238,9 @@ model AttendanceDevice {
   serialNumber   String          @unique
   type           DeviceType
   isActive       Boolean         @default(true)
+  apiKeyHash     String?
+  lastHeartbeatAt DateTime?
+  lastSyncAt     DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   site           Site?           @relation(fields: [siteId], references: [id])
@@ -252,6 +259,8 @@ model AttendanceLog {
   punchTime DateTime
   punchType PunchType
   deviceId  String?
+  deviceEventId String?
+  receivedAt DateTime @default(now())
 
   latitude  Decimal? @db.Decimal(10, 7)
   longitude Decimal? @db.Decimal(10, 7)
@@ -267,6 +276,8 @@ model AttendanceLog {
   @@index([punchType])
   @@index([workerId, punchTime])
   @@index([deviceId])
+  @@unique([deviceId, deviceEventId])
+  @@index([deviceId, punchTime])
   @@index([createdAt])
   @@map("attendance_logs")
 }
@@ -309,10 +320,11 @@ model LeaveRequest {
   reason         String?
   approvalStatus ApprovalStatus @default(PENDING)
   approvedById   String?
+  approvedAt     DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   worker         Worker         @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  approvedBy     Worker?        @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedBy     Admin?         @relation("LeaveApprovedBy", fields: [approvedById], references: [id])
 
   @@index([workerId])
   @@index([fromDate])
@@ -368,10 +380,13 @@ model AttendanceCorrection {
   requestedCheckOut DateTime?
   reason            String
   approvalStatus    ApprovalStatus @default(PENDING)
+  approvedById      String?
+  approvedAt        DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   worker            Worker         @relation(fields: [workerId], references: [id])
   attendance        Attendance     @relation(fields: [attendanceId], references: [id])
+  approvedBy        Admin?         @relation("CorrectionApprovedBy", fields: [approvedById], references: [id])
 
   @@index([workerId])
   @@index([attendanceId])

@@ -1,25 +1,21 @@
 import dotenv from "dotenv";
-import path, { dirname } from "path";
-import { fileURLToPath } from "url";
-import z from "zod";
+import { z } from "zod";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+dotenv.config();
 
-// Load environment variables from .env file, mainly for the development environment
-dotenv.config({ path: path.join(__dirname, "../.env") });
+const parsed = z
+  .object({
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
+    PORT: z.coerce.number().int().positive().default(3000),
+    CORS_ALLOWED_ORIGIN: z.string().default("http://localhost:3000"),
+    DATABASE_URL: z.string().min(1),
+    DIRECT_URL: z.string().min(1).optional(),
+    JWT_SECRET: z.string().min(32).optional(),
+    SECRET_KEY: z.string().min(1).optional(),
+  })
+  .parse(process.env);
 
-const baseConfigSchema = z.object({
-  NODE_ENV: z.enum(["development", "production"]),
-  CORS_ALLOWED_ORIGIN: z.string(),
-
-  PORT: z.coerce.number().int().positive(),
-
-  DATABASE_URL: z.string().min(1),
-  DIRECT_URL: z.string().min(1),
-  SECRET_KEY: z.string().min(1),
-});
-
-const env = baseConfigSchema.parse(process.env);
-
+const env = { ...parsed, JWT_SECRET: parsed.JWT_SECRET ?? parsed.SECRET_KEY! };
 export default env;

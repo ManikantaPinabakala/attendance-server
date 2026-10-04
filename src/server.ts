@@ -1,51 +1,23 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 import morgan from "morgan";
 import env from "./config.js";
-import healthRoute from "./handlers/routes.js";
+import routes from "./handlers/routes.js";
 
 const app = express();
+const origins = env.CORS_ALLOWED_ORIGIN.split(",").map((origin) =>
+  origin.trim(),
+);
+app.use(
+  cors({
+    origin: (origin, done) => done(null, !origin || origins.includes(origin)),
+    credentials: true,
+  }),
+);
+app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(express.json({ limit: "1mb" }));
+app.use("/api", routes);
 
-const PORT = env.PORT;
-const corsOptions: cors.CorsOptions = {
-  origin: (
-    origin: string | undefined,
-    callback: (err: Error | null, allow?: boolean) => void,
-  ) => {
-    const allowedOrigins = env.CORS_ALLOWED_ORIGIN.split(",").map((o) =>
-      o.trim(),
-    );
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
-app.use(/./, cors(corsOptions));
-morgan.token("local-time", () => {
-  return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-});
-
-app.use(morgan(":method :url :status - :response-time ms - [:local-time]"));
-app.use(express.json());
-
-// Use the imported routes
-app.use("/api", healthRoute);
-
-// Start the server after initializing tables
-(async () => {
-  try {
-    // await connectAndQuery();
-    app.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to initialize tables or start the server:", error);
-    process.exit(1);
-  }
-})();
+app.listen(env.PORT, () =>
+  console.info(`Attendance API listening on ${env.PORT}`),
+);
