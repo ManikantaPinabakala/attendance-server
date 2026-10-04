@@ -1,30 +1,32 @@
-import { z } from "zod";
 import { EmploymentType } from "@prisma/client";
+import { z } from "zod";
+import { paginationSchema } from "../../shared/utils/pagination.js";
 
+export const workerIdSchema = z.string().uuid("Invalid worker id");
 export const createWorkerSchema = z.object({
-  employeeCode: z.string().min(1, "Employee code is required").max(50),
-  firstName: z.string().min(1, "First name is required").max(100),
-  lastName: z.string().max(100).optional(),
-  phone: z
-    .string()
-    .regex(/^[0-9]{10}$/, "Invalid phone number")
-    .optional(),
-
-  email: z.email("Invalid email").optional(),
-  departmentId: z.uuid("Invalid department id").optional(),
-  designationId: z.uuid("Invalid designation id").optional(),
-  siteId: z.uuid("Invalid site id").optional(),
-  employmentType: z.enum(EmploymentType).optional(),
-  joiningDate: z.coerce.date().refine((date) => !Number.isNaN(date.getTime()), {
-    message: "Invalid joining date",
-  }),
-  biometricId: z.string().max(100).optional(),
-  faceId: z.string().optional(),
+  employeeCode: z.string().trim().min(1).max(50),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(30).optional(),
+  email: z.string().email().optional(),
+  departmentId: z.string().uuid().optional(),
+  designationId: z.string().uuid().optional(),
+  siteId: z.string().uuid().optional(),
+  employmentType: z.nativeEnum(EmploymentType).default("PERMANENT"),
+  joiningDate: z.coerce.date(),
+  biometricId: z.string().trim().max(100).optional(),
+  faceId: z.string().trim().max(100).optional(),
   isActive: z.boolean().optional(),
 });
-
-export type CreateWorkerInput = z.infer<typeof createWorkerSchema>;
-
-export const updateWorkerSchema = createWorkerSchema.partial();
-
-export type UpdateWorkerInput = z.infer<typeof updateWorkerSchema>;
+export const updateWorkerSchema = createWorkerSchema
+  .partial()
+  .omit({ employeeCode: true });
+export const workerListSchema = paginationSchema.extend({
+  search: z.string().trim().max(100).optional(),
+  siteId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().optional(),
+  designationId: z.string().uuid().optional(),
+  employmentType: z.nativeEnum(EmploymentType).optional(),
+  isActive: z.boolean().optional(),
+});
+export const workerStatusSchema = z.object({ isActive: z.boolean() });
